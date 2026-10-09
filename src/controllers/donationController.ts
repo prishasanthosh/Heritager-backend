@@ -69,7 +69,7 @@ export const createDonation = asyncHandler(async (req: Request, res: Response) =
 
   const session = await createPaymentSession({
     amountInRupees: data.amount,
-    description: `Donation — ${project.name}`,
+    description: `Donation for ${project.name}`,
     orderId: donation.id,
     customerEmail: data.donorEmail,
     customerPhone: data.donorPhone,
