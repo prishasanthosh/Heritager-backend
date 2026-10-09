@@ -90,7 +90,7 @@ export const checkout = asyncHandler(async (req: Request, res: Response) => {
     description: `Order ${order.id}`,
     orderId: order.id,
     customerEmail: user?.email ?? "",
-    customerName: user?.name ?? shippingAddress.fullName,
+    customerPhone: shippingAddress.phone,
   });
 
   order.zohoPaymentSessionId = session.payments_session_id;

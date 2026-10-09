@@ -59,6 +59,7 @@ async function zohoRequest<T>(path: string, init: RequestInit = {}): Promise<T> 
 
 export type ZohoPaymentSession = {
   payments_session_id: string;
+  access_key: string;
   status: string;
 };
 
@@ -68,36 +69,60 @@ export async function createPaymentSession(params: {
   description: string;
   orderId: string;
   customerEmail: string;
-  customerName: string;
+  customerPhone?: string;
+  successUrl?: string;
+  failureUrl?: string;
 }) {
   if (!isZohoConfigured) {
     throw new ApiError(
       503,
-      "Zoho Payments is not configured yet. Set ZOHO_PAYMENTS_* variables in the backend .env file, or choose Cash on Delivery at checkout."
+      "Zoho Payments is not configured yet. Set the ZOHO_PAYMENTS_* variables in the backend environment."
     );
   }
 
-  return zohoRequest<ZohoPaymentSession>("/api/v1/paymentsessions", {
+  const successUrl = new URL(params.successUrl ?? env.zoho.redirectUrl);
+  const failureUrl = new URL(params.failureUrl ?? env.zoho.redirectUrl);
+  if (!params.successUrl) successUrl.searchParams.set("paymentResult", "success");
+  if (!params.failureUrl) failureUrl.searchParams.set("paymentResult", "failure");
+
+  const response = await zohoRequest<{ payments_session: ZohoPaymentSession }>("/api/v1/paymentsessions", {
     method: "POST",
     body: JSON.stringify({
       amount: params.amountInRupees.toFixed(2),
       currency: params.currency ?? "INR",
-      description: params.description,
       invoice_number: params.orderId,
       meta_data: [{ key: "order_id", value: params.orderId }],
-      customer: { name: params.customerName, email: params.customerEmail },
+      configurations: {
+        hosted_checkout_parameters: {
+          success_url: successUrl.toString(),
+          failure_url: failureUrl.toString(),
+          description: params.description,
+          email: params.customerEmail,
+          ...(params.customerPhone ? { phone: params.customerPhone } : {}),
+        },
+      },
     }),
   });
+
+  if (!response.payments_session?.payments_session_id || !response.payments_session.access_key) {
+    throw new ApiError(502, "Zoho Payments did not return a valid checkout session");
+  }
+
+  return response.payments_session;
 }
 
 export type ZohoPayment = {
   payment_id: string;
   status: "succeeded" | "failed" | "pending" | "cancelled" | string;
   amount: string;
+  currency: string;
+  payments_session_id: string;
 };
 
 export async function getPaymentStatus(paymentId: string) {
-  return zohoRequest<{ payment: ZohoPayment }>(`/api/v1/payments/${paymentId}`);
+  return zohoRequest<{ payment: ZohoPayment }>(
+    `/api/v1/payments/${encodeURIComponent(paymentId)}`,
+  );
 }
 
 export { isZohoConfigured };

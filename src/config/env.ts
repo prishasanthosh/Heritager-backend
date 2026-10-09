@@ -42,6 +42,8 @@ export const env = {
     apiDomain: process.env.ZOHO_PAYMENTS_API_DOMAIN ?? "https://payments.zoho.in",
     accountsDomain: process.env.ZOHO_ACCOUNTS_DOMAIN ?? "https://accounts.zoho.in",
     redirectUrl: process.env.ZOHO_PAYMENTS_REDIRECT_URL ?? "http://localhost:5174/order-confirmation",
+    donationReturnUrl:
+      process.env.ZOHO_PAYMENTS_DONATION_RETURN_URL ?? "http://localhost:8080/donation-success",
   },
 };
 

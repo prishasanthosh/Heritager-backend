@@ -6,6 +6,9 @@ const donationSchema = new Schema(
     donorEmail: { type: String, required: true, trim: true, lowercase: true },
     donorPhone: { type: String, required: true, trim: true },
     panNumber: { type: String, required: true, trim: true },
+    dateOfBirth: { type: String, trim: true, default: "" },
+    customPurpose: { type: String, trim: true, default: "" },
+    communicationConsent: { type: Boolean, default: false },
     address: {
       line1: { type: String, required: true, trim: true },
       line2: { type: String, trim: true, default: "" },
