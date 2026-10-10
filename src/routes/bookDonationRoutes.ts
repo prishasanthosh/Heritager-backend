@@ -8,6 +8,7 @@ import { createLocalDiskStorage } from "../config/localUpload.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import {
   approveBookDonation,
+  countPendingBookDonations,
   listBookDonations,
   rejectBookDonation,
   submitBookDonation,
@@ -32,6 +33,7 @@ const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024, files: 5 }
 
 router.post("/", submitLimiter, upload.array("photos", 5), submitBookDonation);
 
+router.get("/pending-count", requireAuth, requireAdmin, countPendingBookDonations);
 router.get("/", requireAuth, requireAdmin, listBookDonations);
 router.patch("/:id/approve", requireAuth, requireAdmin, approveBookDonation);
 router.patch("/:id/reject", requireAuth, requireAdmin, rejectBookDonation);
