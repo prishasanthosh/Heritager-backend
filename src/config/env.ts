@@ -8,12 +8,23 @@ function required(name: string, fallback?: string): string {
   return value;
 }
 
+function withDefaultMongoDatabase(uri: string, database: string): string {
+  const parsed = new URL(uri);
+  if (!parsed.pathname || parsed.pathname === "/") {
+    parsed.pathname = `/${database}`;
+  }
+  return parsed.toString();
+}
+
 export const env = {
   port: Number(process.env.PORT ?? 5000),
   nodeEnv: process.env.NODE_ENV ?? "development",
   isProd: process.env.NODE_ENV === "production",
 
-  mongoUri: required("MONGODB_URI", "mongodb://127.0.0.1:27017/heritage-heart"),
+  mongoUri: withDefaultMongoDatabase(
+    required("MONGODB_URI", "mongodb://127.0.0.1:27017/heritage-heart"),
+    "heritage-heart"
+  ),
 
   jwtAccessSecret: required("JWT_ACCESS_SECRET"),
   jwtRefreshSecret: required("JWT_REFRESH_SECRET"),

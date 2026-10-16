@@ -19,6 +19,7 @@ import projectRoutes from "./routes/projectRoutes.js";
 import bookDonationRoutes from "./routes/bookDonationRoutes.js";
 import bookRequestRoutes from "./routes/bookRequestRoutes.js";
 import { contactRouter, newsletterRouter, volunteerRouter } from "./routes/engagementRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 
 export function createApp() {
@@ -50,6 +51,7 @@ export function createApp() {
 
   app.get("/api/health", (_req, res) => res.json({ status: "ok", time: new Date().toISOString() }));
 
+  app.use("/api/admin", adminRoutes);
   app.use("/api/auth", authRoutes);
   app.use("/api/products", productRoutes);
   app.use("/api/categories", categoryRoutes);
