@@ -16,6 +16,11 @@ function withDefaultMongoDatabase(uri: string, database: string): string {
   return parsed.toString();
 }
 
+const configuredCorsOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 export const env = {
   port: Number(process.env.PORT ?? 5000),
   nodeEnv: process.env.NODE_ENV ?? "development",
@@ -34,10 +39,10 @@ export const env = {
 
   adminBootstrapEmail: (process.env.ADMIN_BOOTSTRAP_EMAIL ?? "").toLowerCase(),
 
-  corsOrigins: (process.env.CORS_ORIGINS ?? "http://localhost:5173")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean),
+  corsOrigins: Array.from(new Set([
+    ...configuredCorsOrigins,
+    "https://admin.indianheritager.org",
+  ])),
 
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME ?? "",
