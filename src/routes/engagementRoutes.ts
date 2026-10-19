@@ -8,6 +8,7 @@ import {
   submitContact,
   submitVolunteerApplication,
   updateContactStatus,
+  updateNewsletterSubscriberStatus,
   updateVolunteerStatus,
 } from "../controllers/engagementController.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
@@ -32,5 +33,6 @@ volunteerRouter.patch("/:id/status", requireAuth, requireAdmin, updateVolunteerS
 const newsletterRouter = Router();
 newsletterRouter.post("/", publicFormLimiter, subscribeNewsletter);
 newsletterRouter.get("/", requireAuth, requireAdmin, listNewsletterSubscribers);
+newsletterRouter.patch("/:id/status", requireAuth, requireAdmin, updateNewsletterSubscriberStatus);
 
 export { contactRouter, volunteerRouter, newsletterRouter };

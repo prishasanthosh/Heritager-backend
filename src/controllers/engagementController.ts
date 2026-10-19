@@ -79,13 +79,31 @@ export const subscribeNewsletter = asyncHandler(async (req: Request, res: Respon
   const { email } = newsletterSchema.parse(req.body);
   await NewsletterSubscriber.findOneAndUpdate(
     { email: email.toLowerCase() },
-    { email: email.toLowerCase() },
-    { upsert: true }
+    { $set: { email: email.toLowerCase(), status: "subscribed" } },
+    { upsert: true, setDefaultsOnInsert: true }
   );
   res.status(201).json({ message: "Subscribed" });
 });
 
 export const listNewsletterSubscribers = asyncHandler(async (_req: Request, res: Response) => {
-  const subscribers = await NewsletterSubscriber.find().sort({ createdAt: -1 });
-  res.json({ subscribers });
+  const subscribers = await NewsletterSubscriber.find().sort({ createdAt: -1 }).lean();
+  res.json({
+    subscribers: subscribers.map((subscriber) => ({
+      ...subscriber,
+      status: subscriber.status ?? "subscribed",
+    })),
+  });
+});
+
+const newsletterStatusSchema = z.object({ status: z.enum(["subscribed", "unsubscribed"]) });
+
+export const updateNewsletterSubscriberStatus = asyncHandler(async (req: Request, res: Response) => {
+  const { status } = newsletterStatusSchema.parse(req.body);
+  const subscriber = await NewsletterSubscriber.findByIdAndUpdate(
+    req.params.id,
+    { status },
+    { new: true, runValidators: true }
+  );
+  if (!subscriber) throw new ApiError(404, "Newsletter subscriber not found");
+  res.json({ subscriber });
 });

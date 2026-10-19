@@ -84,6 +84,32 @@ export const adminLogin = asyncHandler(async (req: Request, res: Response) => {
   res.json({ user });
 });
 
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(72),
+  newPassword: z.string().min(8).max(72),
+});
+
+export const changePassword = asyncHandler(async (req: Request, res: Response) => {
+  const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+  const user = await User.findById(req.user!.sub);
+  if (!user || user.role !== "admin") {
+    throw new ApiError(403, "Admin access required");
+  }
+
+  if (!(await user.comparePassword(currentPassword))) {
+    throw new ApiError(400, "Current password is incorrect");
+  }
+  if (await user.comparePassword(newPassword)) {
+    throw new ApiError(400, "New password must be different from your current password");
+  }
+
+  user.passwordHash = await bcrypt.hash(newPassword, 12);
+  user.refreshTokenVersion += 1;
+  await user.save();
+  await issueSession(res, { id: user.id, role: user.role, refreshTokenVersion: user.refreshTokenVersion });
+  res.json({ message: "Password changed successfully" });
+});
+
 export const refresh = asyncHandler(async (req: Request, res: Response) => {
   const token = req.cookies?.[REFRESH_COOKIE_NAME];
   if (!token) {
