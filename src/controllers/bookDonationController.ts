@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import mongoose from "mongoose";
 import { z } from "zod";
 import { BookDonation, BOOK_CONDITIONS, BOOK_DELIVERY_METHODS } from "../models/BookDonation.js";
 import { Category } from "../models/Category.js";
@@ -6,6 +7,8 @@ import { Product } from "../models/Product.js";
 import { isCloudinaryConfigured } from "../config/env.js";
 import { toPublicFile } from "../config/localUpload.js";
 import { asyncHandler, ApiError } from "../utils/asyncHandler.js";
+import { parseVolunteerFields, saveVolunteerApplication } from "../utils/volunteer.js";
+import { sendBookDonationConfirmation } from "../services/bookDonationEmail.js";
 
 const PROJECT_CATEGORY_NAME = "Project Vidhyadhanam";
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -31,6 +34,11 @@ const submitSchema = z.object({
   bookQuantity: z.coerce.number().int().min(1).max(500).optional().default(1),
   bookLanguage: z.string().max(60).optional().default(""),
   additionalNotes: z.string().max(1000).optional().default(""),
+  wouldLikeVolunteer: z.union([z.literal(true), z.literal("true"), z.literal(false), z.literal("false")])
+    .optional()
+    .transform((value) => value === true || value === "true")
+    .default(false),
+  idempotencyKey: z.string().min(8).max(128).optional(),
   consent: z.union([z.literal(true), z.literal("true")]).transform(() => true),
   deliveryMethod: z.enum(BOOK_DELIVERY_METHODS).refine((method) => method !== "not_specified"),
 });
@@ -45,6 +53,18 @@ export const submitBookDonation = asyncHandler(async (req: Request, res: Respons
   if (files.length === 0) {
     throw new ApiError(400, "Please upload at least one photo of the book");
   }
+  if (data.idempotencyKey) {
+    const existingDonation = await BookDonation.findOne({ idempotencyKey: data.idempotencyKey });
+    if (existingDonation) {
+      res.status(200).json({
+        message: "Donation already received",
+        donation: existingDonation,
+        emailStatus: existingDonation.confirmationEmail?.status,
+      });
+      return;
+    }
+  }
+
   const photos = files.map((f) => toPublicFile(f, req, "book-donations", isCloudinaryConfigured));
   if (data.donorDateOfBirth) {
     const dateOfBirth = new Date(`${data.donorDateOfBirth}T00:00:00.000Z`);
@@ -57,7 +77,7 @@ export const submitBookDonation = asyncHandler(async (req: Request, res: Respons
     }
   }
 
-  const donation = await BookDonation.create({
+  const donationData = {
     donor: {
       fullName: data.donorFullName,
       dateOfBirth: data.donorDateOfBirth,
@@ -85,9 +105,68 @@ export const submitBookDonation = asyncHandler(async (req: Request, res: Respons
     additionalNotes: data.additionalNotes,
     consent: data.consent,
     deliveryMethod: data.deliveryMethod,
-  });
+    ...(data.idempotencyKey ? { idempotencyKey: data.idempotencyKey } : {}),
+  };
 
-  res.status(201).json({ message: "Thank you — your book donation is pending review", donation });
+  let donation!: InstanceType<typeof BookDonation>;
+  try {
+    if (data.wouldLikeVolunteer) {
+      const volunteerInput = Object.fromEntries(
+        Object.entries(req.body as Record<string, unknown>)
+          .filter(([key]) => key.startsWith("volunteer_"))
+          .map(([key, value]) => [key.slice("volunteer_".length), value]),
+      );
+      const areas = req.body.volunteerAreasOfInterest;
+      const volunteerFields = parseVolunteerFields({
+        ...volunteerInput,
+        areasOfInterest: areas,
+      });
+
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          const [createdDonation] = await BookDonation.create([donationData], { session });
+          const application = await saveVolunteerApplication(
+            volunteerFields,
+            "book_donation",
+            { bookDonation: String(createdDonation._id) },
+            session,
+          );
+          if (!application) throw new ApiError(500, "Could not save volunteer registration");
+          createdDonation.volunteerApplication = application._id;
+          await createdDonation.save({ session });
+          donation = createdDonation;
+        });
+      } finally {
+        await session.endSession();
+      }
+    } else {
+      donation = await BookDonation.create(donationData);
+    }
+  } catch (error) {
+    if (data.idempotencyKey && (error as { code?: number }).code === 11000) {
+      const existingDonation = await BookDonation.findOne({ idempotencyKey: data.idempotencyKey });
+      if (existingDonation) {
+        res.status(200).json({
+          message: "Donation already received",
+          donation: existingDonation,
+          emailStatus: existingDonation.confirmationEmail?.status,
+        });
+        return;
+      }
+    }
+    throw error;
+  }
+
+  const notification = await sendBookDonationConfirmation(donation);
+  donation.confirmationEmail = notification;
+  await donation.save();
+
+  res.status(201).json({
+    message: "Thank you — your book donation is pending review",
+    donation,
+    emailStatus: notification.status,
+  });
 });
 
 // --- Admin ---

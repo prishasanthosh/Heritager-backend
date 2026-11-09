@@ -48,6 +48,35 @@ const orderSchema = new Schema(
     paymentStatus: { type: String, enum: PAYMENT_STATUSES, default: "pending" },
     zohoPaymentSessionId: { type: String },
     zohoPaymentId: { type: String },
+    volunteerRegistration: {
+      type: new Schema(
+        {
+          name: { type: String, required: true, trim: true },
+          email: { type: String, required: true, trim: true, lowercase: true },
+          phone: { type: String, required: true, trim: true },
+          dateOfBirth: { type: String, required: true },
+          gender: { type: String, default: "" },
+          address: { type: String, required: true },
+          city: { type: String, required: true },
+          state: { type: String, required: true },
+          country: { type: String, required: true },
+          pinCode: { type: String, required: true },
+          currentProfession: { type: String, required: true },
+          organizationName: { type: String, required: true },
+          educationalQualification: { type: String, required: true },
+          occupation: { type: String, required: true },
+          whyVolunteer: { type: String, required: true },
+          areasOfInterest: { type: [String], default: [] },
+          preferredMode: { type: String, required: true },
+          availability: { type: String, required: true },
+          hoursPerWeek: { type: Number, required: true },
+          skills: { type: String, required: true },
+          additionalInformation: { type: String, default: "" },
+        },
+        { _id: false }
+      ),
+    },
+    volunteerApplication: { type: Schema.Types.ObjectId, ref: "VolunteerApplication" },
     statusHistory: {
       type: [
         new Schema(

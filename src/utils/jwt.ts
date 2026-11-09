@@ -32,7 +32,7 @@ const msPerDay = 24 * 60 * 60 * 1000;
 export const accessCookieOptions = {
   httpOnly: true,
   secure: env.isProd,
-  sameSite: env.isProd ? ("none" as const) : ("lax" as const),
+  sameSite: env.isProd ? env.cookieSameSite : ("lax" as const),
   domain: env.cookieDomain,
   maxAge: 15 * 60 * 1000,
   path: "/",
@@ -41,7 +41,7 @@ export const accessCookieOptions = {
 export const refreshCookieOptions = {
   httpOnly: true,
   secure: env.isProd,
-  sameSite: env.isProd ? ("none" as const) : ("lax" as const),
+  sameSite: env.isProd ? env.cookieSameSite : ("lax" as const),
   domain: env.cookieDomain,
   maxAge: 30 * msPerDay,
   path: "/api/auth",

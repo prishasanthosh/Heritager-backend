@@ -3,8 +3,8 @@ import { z } from "zod";
 import { Donation } from "../models/Donation.js";
 import { Project } from "../models/Project.js";
 import { asyncHandler, ApiError } from "../utils/asyncHandler.js";
-import { env } from "../config/env.js";
-import { createPaymentSession, getPaymentStatus, isZohoConfigured } from "../services/zohoPayments.js";
+import { env, isZohoPaymentsEnabled } from "../config/env.js";
+import { createPaymentSession, getPaymentStatus } from "../services/zohoPayments.js";
 
 const addressSchema = z.object({
   line1: z.string().min(2).max(200),
@@ -32,7 +32,7 @@ const donateSchema = z.object({
 
 export const createDonation = asyncHandler(async (req: Request, res: Response) => {
   const data = donateSchema.parse(req.body);
-  if (!isZohoConfigured) {
+  if (!isZohoPaymentsEnabled) {
     throw new ApiError(503, "Online donations are temporarily unavailable. Please try again later.");
   }
 

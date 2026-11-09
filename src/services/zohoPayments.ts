@@ -70,8 +70,8 @@ export async function createPaymentSession(params: {
   orderId: string;
   customerEmail: string;
   customerPhone?: string;
-  successUrl?: string;
-  failureUrl?: string;
+  successUrl: string;
+  failureUrl: string;
 }) {
   if (!isZohoConfigured) {
     throw new ApiError(
@@ -80,10 +80,8 @@ export async function createPaymentSession(params: {
     );
   }
 
-  const successUrl = new URL(params.successUrl ?? env.zoho.redirectUrl);
-  const failureUrl = new URL(params.failureUrl ?? env.zoho.redirectUrl);
-  if (!params.successUrl) successUrl.searchParams.set("paymentResult", "success");
-  if (!params.failureUrl) failureUrl.searchParams.set("paymentResult", "failure");
+  const successUrl = new URL(params.successUrl);
+  const failureUrl = new URL(params.failureUrl);
 
   const response = await zohoRequest<{ payments_session: ZohoPaymentSession }>("/api/v1/paymentsessions", {
     method: "POST",
@@ -108,7 +106,10 @@ export async function createPaymentSession(params: {
     throw new ApiError(502, "Zoho Payments did not return a valid checkout session");
   }
 
-  return response.payments_session;
+  return {
+    ...response.payments_session,
+    checkout_url: `https://${new URL(env.zoho.apiDomain).hostname}/hostedcheckout/${encodeURIComponent(response.payments_session.access_key)}`,
+  };
 }
 
 export type ZohoPayment = {

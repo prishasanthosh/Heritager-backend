@@ -38,11 +38,28 @@ const bookDonationSchema = new Schema(
     additionalNotes: { type: String, default: "" },
     consent: { type: Boolean, required: true },
     deliveryMethod: { type: String, enum: BOOK_DELIVERY_METHODS, default: "not_specified" },
+    volunteerApplication: { type: Schema.Types.ObjectId, ref: "VolunteerApplication" },
+    idempotencyKey: { type: String, trim: true },
+    confirmationEmail: {
+      status: {
+        type: String,
+        enum: ["pending", "sent", "failed", "not_configured", "disabled"],
+        default: "pending",
+      },
+      messageId: { type: String, default: "" },
+      error: { type: String, default: "" },
+      sentAt: { type: Date },
+    },
     status: { type: String, enum: BOOK_DONATION_STATUSES, default: "pending_review" },
     adminNote: { type: String, default: "" },
     product: { type: Schema.Types.ObjectId, ref: "Product" },
   },
   { timestamps: true }
+);
+
+bookDonationSchema.index(
+  { idempotencyKey: 1 },
+  { unique: true, partialFilterExpression: { idempotencyKey: { $type: "string" } } }
 );
 
 export const BookDonation = model("BookDonation", bookDonationSchema);

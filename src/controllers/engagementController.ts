@@ -4,6 +4,7 @@ import { ContactMessage } from "../models/ContactMessage.js";
 import { VolunteerApplication } from "../models/VolunteerApplication.js";
 import { NewsletterSubscriber } from "../models/NewsletterSubscriber.js";
 import { asyncHandler, ApiError } from "../utils/asyncHandler.js";
+import { parseVolunteerFields, saveVolunteerApplication } from "../utils/volunteer.js";
 
 // --- Contact ---
 
@@ -39,26 +40,36 @@ export const updateContactStatus = asyncHandler(async (req: Request, res: Respon
 
 // --- Volunteer ---
 
-const volunteerSchema = z.object({
-  name: z.string().min(2).max(80),
-  email: z.string().email(),
-  phone: z.string().min(6).max(20),
-  availability: z.string().max(40).optional(),
-  skills: z.string().max(200).optional(),
-  message: z.string().max(500).optional(),
-});
-
 export const submitVolunteerApplication = asyncHandler(async (req: Request, res: Response) => {
-  const data = volunteerSchema.parse(req.body);
-  const application = await VolunteerApplication.create(data);
-  res.status(201).json({ message: "Application received", application });
+  const fields = parseVolunteerFields(req.body);
+  const existing = await VolunteerApplication.exists({ email: fields.email });
+  const application = await saveVolunteerApplication(fields, "standalone");
+  res.status(existing ? 200 : 201).json({ message: "Application received", application });
 });
 
 export const listVolunteerApplications = asyncHandler(async (req: Request, res: Response) => {
-  const { status } = req.query as Record<string, string>;
+  const { status, source, q } = z
+    .object({
+      status: z.enum(["new", "contacted", "onboarded", "declined"]).optional(),
+      source: z.enum(["standalone", "book_donation", "book_purchase"]).optional(),
+      q: z.string().trim().max(120).optional(),
+    })
+    .parse(req.query);
   const filter: Record<string, unknown> = {};
   if (status) filter.status = status;
-  const applications = await VolunteerApplication.find(filter).sort({ createdAt: -1 });
+  if (source) filter.registrationSource = source;
+  if (q?.trim()) {
+    const escaped = q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    filter.$or = [
+      { name: { $regex: escaped, $options: "i" } },
+      { email: { $regex: escaped, $options: "i" } },
+      { phone: { $regex: escaped, $options: "i" } },
+    ];
+  }
+  const applications = await VolunteerApplication.find(filter)
+    .populate("bookDonation", "donor book deliveryMethod createdAt")
+    .populate("order", "total status paymentStatus createdAt")
+    .sort({ createdAt: -1 });
   res.json({ applications });
 });
 
